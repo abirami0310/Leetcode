@@ -1,0 +1,35 @@
+#include <pthread.h>
+#include <semaphore.h>
+#include <stdlib.h>
+void releaseHydrogen();
+void releaseOxygen();
+typedef struct {
+sem_t h_sem;
+sem_t o_sem;
+pthread_barrier_t barrier;
+} H2O;
+H2O* h2oCreate() {
+H2O* obj = (H2O*)malloc(sizeof(H2O));
+sem_init(&obj->h_sem, 0, 2);
+sem_init(&obj->o_sem, 0, 1);
+pthread_barrier_init(&obj->barrier, NULL, 3);
+return obj;
+}
+void hydrogen(H2O* obj) {
+sem_wait(&obj->h_sem);
+releaseHydrogen();
+pthread_barrier_wait(&obj->barrier);
+sem_post(&obj->h_sem);
+}
+void oxygen(H2O* obj) {
+sem_wait(&obj->o_sem);
+releaseOxygen();
+pthread_barrier_wait(&obj->barrier);
+sem_post(&obj->o_sem);
+}
+void h2oFree(H2O* obj) {
+sem_destroy(&obj->h_sem);
+sem_destroy(&obj->o_sem);
+pthread_barrier_destroy(&obj->barrier);
+free(obj);
+}
