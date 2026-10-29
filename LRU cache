@@ -1,0 +1,143 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+typedef struct Node {
+int key;
+int value;
+struct Node* prev;
+struct Node* next;
+} Node;
+typedef struct HashEntry {
+int key;
+Node* node;
+struct HashEntry* next;
+} HashEntry;
+typedef struct {
+int capacity;
+int size;
+int hashSize;
+Node* head;
+Node* tail;
+HashEntry** hashMap;
+} LRUCache;
+Node* createNode(int key, int value) {
+Node* node = (Node*)malloc(sizeof(Node));
+node->key = key;
+node->value = value;
+node->prev = NULL;
+node->next = NULL;
+return node;
+}
+int hashFunction(int key, int hashSize) {
+int hash = key % hashSize;
+return hash < 0 ? hash + hashSize : hash;
+}
+void addToHead(LRUCache* obj, Node* node) {
+    node->next = obj->head->next;
+node->prev = obj->head;
+obj->head->next->prev = node;
+obj->head->next = node;
+}
+void removeNode(Node* node) {
+node->prev->next = node->next;
+node->next->prev = node->prev;
+}
+void moveToHead(LRUCache* obj, Node* node) {
+removeNode(node);
+addToHead(obj, node);
+}
+void hashInsert(LRUCache* obj, int key, Node* node) {
+int index = hashFunction(key, obj->hashSize);
+HashEntry* entry = (HashEntry*)malloc(sizeof(HashEntry));
+entry->key = key;
+entry->node = node;
+entry->next = obj->hashMap[index];
+obj->hashMap[index] = entry;
+}
+Node* hashSearch(LRUCache* obj, int key) {
+int index = hashFunction(key, obj->hashSize);
+HashEntry* curr = obj->hashMap[index];
+while (curr) {
+if (curr->key == key) {
+return curr->node;
+}
+curr = curr->next;
+}
+return NULL;
+}
+void hashDelete(LRUCache* obj, int key) {
+int index = hashFunction(key, obj->hashSize);
+HashEntry* curr = obj->hashMap[index];
+HashEntry* prev = NULL;
+while (curr) {
+if (curr->key == key) {
+if (prev == NULL) {
+obj->hashMap[index] = curr->next;
+} else {
+prev->next = curr->next;
+}
+free(curr);
+return;
+}
+prev = curr;
+curr = curr->next;
+}
+}
+LRUCache* lRUCacheCreate(int capacity) {
+LRUCache* obj = (LRUCache*)malloc(sizeof(LRUCache));
+obj->capacity = capacity;
+obj->size = 0;
+obj->hashSize = capacity * 2 + 1;
+obj->hashMap = (HashEntry**)calloc(obj->hashSize, sizeof(HashEntry*));
+obj->head = createNode(-1, -1);
+obj->tail = createNode(-1, -1);
+obj->head->next = obj->tail;
+obj->tail->prev = obj->head;
+return obj;
+}
+int lRUCacheGet(LRUCache* obj, int key) {
+Node* node = hashSearch(obj, key);
+if (node == NULL) {
+return -1;
+}
+moveToHead(obj, node);
+return node->value;
+}
+void lRUCachePut(LRUCache* obj, int key, int value) {
+Node* node = hashSearch(obj, key);
+if (node != NULL) {
+node->value = value;
+moveToHead(obj, node);
+} else {
+Node* newNode = createNode(key, value);
+if (obj->size == obj->capacity) {
+Node* lruNode = obj->tail->prev;
+removeNode(lruNode);
+hashDelete(obj, lruNode->key);
+free(lruNode);
+obj->size--;
+}
+addToHead(obj, newNode);
+hashInsert(obj, key, newNode);
+obj->size++;
+}
+}
+void lRUCacheFree(LRUCache* obj) {
+if (!obj) return;
+Node* curr = obj->head;
+while (curr) {
+Node* next = curr->next;
+free(curr);
+curr = next;
+}
+for (int i = 0; i < obj->hashSize; i++) {
+HashEntry* entry = obj->hashMap[i];
+while (entry) {
+HashEntry* nextEntry = entry->next;
+free(entry);
+entry = nextEntry;
+}
+}
+free(obj->hashMap);
+free(obj);
+}
